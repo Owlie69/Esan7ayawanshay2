@@ -212,6 +212,26 @@
 
   .error-msg { color: #e74c3c; font-size: .85rem; text-align: center; margin-top: 8px; }
 
+  @keyframes tickBump {
+    0%   { transform: scale(1.25); opacity: 0.6; }
+    100% { transform: scale(1);    opacity: 1;   }
+  }
+  .timer-count.ticking { animation: tickBump 0.35s ease-out; }
+
+  .ans-wrap { display: flex; align-items: center; gap: 6px; }
+  .ans-wrap input { flex: 1; }
+  .ans-clear {
+    flex-shrink: 0;
+    background: rgba(231,76,60,.2);
+    border: 1px solid rgba(231,76,60,.45);
+    color: #e74c3c;
+    border-radius: 6px;
+    width: 30px; height: 30px;
+    font-size: 1rem; font-weight: 700;
+    cursor: pointer; line-height: 1;
+  }
+  .ans-clear:hover { background: rgba(231,76,60,.45); }
+
   .submitted-badge {
     display: inline-block;
     background: rgba(56,239,125,.2);
@@ -399,6 +419,11 @@
     document.getElementById('submitted-msg').style.display = 'block';
   }
 
+  function clearAnswer(cat) {
+    const el = document.getElementById('ans-' + cat);
+    if (el) { el.value = ''; el.focus(); }
+  }
+
   function nextRound() {
     socket.emit('next_round');
   }
@@ -558,7 +583,10 @@
       row.className = 'cat-row';
       row.innerHTML = `
         <div class="cat-label">${cat}</div>
-        <input type="text" id="ans-${cat}" placeholder="${cat} يبدأ بـ ${data.letter}" maxlength="30">
+        <div class="ans-wrap">
+          <input type="text" id="ans-${cat}" placeholder="${cat} يبدأ بـ ${data.letter}" maxlength="30">
+          <button class="ans-clear" type="button" onclick="clearAnswer('${cat}')" title="مسح الإجابة">×</button>
+        </div>
       `;
       inputs.appendChild(row);
     });
@@ -567,11 +595,20 @@
   });
 
   socket.on('tick', ({ timeLeft }) => {
-    document.getElementById('timer-count').textContent = '⏱ ' + timeLeft;
+    const tc = document.getElementById('timer-count');
+    tc.textContent = '⏱ ' + timeLeft;
+    tc.classList.remove('ticking');
+    void tc.offsetWidth;
+    tc.classList.add('ticking');
+
     const pct = (timeLeft / roundDuration) * 100;
     const bar = document.getElementById('timer-bar');
     bar.style.width = pct + '%';
     if (timeLeft <= 15) bar.classList.add('urgent');
+
+    if (timeLeft <= 0 && !document.getElementById('submit-btn').disabled) {
+      submitAnswers();
+    }
   });
 
   socket.on('round_end', (data) => {
