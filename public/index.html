@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>إنسان حيوان شيء</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    background: #0f0c29;
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    min-height: 100vh;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .screen {
+    display: none;
+    width: 100%;
+    max-width: 640px;
+    animation: fadeIn .3s ease;
+  }
+  .screen.active { display: block; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  h1 {
+    text-align: center;
+    font-size: 2.4rem;
+    margin-bottom: 8px;
+    background: linear-gradient(90deg, #f7971e, #ffd200);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { text-align: center; color: #aaa; margin-bottom: 32px; font-size: .95rem; }
+
+  .card {
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  label { display: block; margin-bottom: 6px; color: #ccc; font-size: .9rem; }
+
+  input[type=text], input[type=number], select {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.2);
+    background: rgba(255,255,255,.1);
+    color: #fff;
+    font-size: 1rem;
+    outline: none;
+    direction: rtl;
+    margin-bottom: 14px;
+  }
+  input[type=text]::placeholder { color: #888; }
+  input[type=text]:focus, input[type=number]:focus {
+    border-color: #ffd200;
+    background: rgba(255,255,255,.15);
+  }
+
+  button {
+    width: 100%;
+    padding: 13px;
+    border-radius: 10px;
+    border: none;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform .1s, opacity .2s;
+  }
+  button:active { transform: scale(.97); }
+  button:disabled { opacity: .5; cursor: default; }
+
+  .btn-primary { background: linear-gradient(90deg, #f7971e, #ffd200); color: #111; }
+  .btn-secondary { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.2); }
+  .btn-success { background: linear-gradient(90deg, #11998e, #38ef7d); color: #111; }
+  .btn-danger { background: linear-gradient(90deg, #c0392b, #e74c3c); color: #fff; }
+
+  .divider {
+    text-align: center;
+    color: #666;
+    margin: 18px 0;
+    position: relative;
+  }
+  .divider::before, .divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 40%;
+    height: 1px;
+    background: rgba(255,255,255,.1);
+  }
+  .divider::before { right: 0; }
+  .divider::after { left: 0; }
+
+  /* Lobby */
+  .room-code-box {
+    text-align: center;
+    background: rgba(255,210,0,.1);
+    border: 2px dashed #ffd200;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  .room-code-box .label { font-size: .85rem; color: #aaa; margin-bottom: 4px; }
+  .room-code-box .code { font-size: 2.2rem; font-weight: 900; letter-spacing: .2em; color: #ffd200; }
+  .room-code-box .hint { font-size: .8rem; color: #888; margin-top: 4px; }
+
+  .player-list { list-style: none; }
+  .player-list li {
+    padding: 10px 14px;
+    background: rgba(255,255,255,.06);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .crown { font-size: 1.1rem; }
+  .waiting-dots { display: inline-block; }
+
+  /* Game */
+  .letter-display {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .letter-display .letter {
+    font-size: 5rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+  }
+  .letter-display .round-info { color: #aaa; font-size: .9rem; margin-top: 6px; }
+
+  .timer-bar-wrap {
+    background: rgba(255,255,255,.1);
+    border-radius: 99px;
+    height: 8px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  .timer-bar {
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, #11998e, #38ef7d);
+    transition: width .9s linear, background .3s;
+  }
+  .timer-bar.urgent { background: linear-gradient(90deg, #c0392b, #e74c3c); }
+
+  .timer-count { text-align: center; font-size: .9rem; color: #aaa; margin-bottom: 16px; }
+
+  .cat-inputs { display: grid; gap: 12px; }
+  .cat-row { display: flex; align-items: center; gap: 12px; }
+  .cat-label {
+    min-width: 60px;
+    text-align: center;
+    background: rgba(255,255,255,.1);
+    border-radius: 8px;
+    padding: 10px 6px;
+    font-size: .85rem;
+    font-weight: 700;
+    color: #ffd200;
+  }
+  .cat-row input { margin-bottom: 0; flex: 1; }
+
+  /* Scoring */
+  .answers-grid { display: grid; gap: 16px; }
+  .cat-result { }
+  .cat-result h4 { color: #ffd200; margin-bottom: 8px; font-size: .9rem; }
+  .answer-rows { display: grid; gap: 6px; }
+  .answer-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(255,255,255,.05);
+    font-size: .9rem;
+  }
+  .answer-row.unique { background: rgba(56,239,125,.1); border: 1px solid rgba(56,239,125,.3); }
+  .answer-row.shared { background: rgba(247,151,30,.08); border: 1px solid rgba(247,151,30,.2); }
+  .answer-row.empty { opacity: .4; }
+  .pts { font-size: .8rem; color: #38ef7d; font-weight: 700; }
+  .pts.shared { color: #ffd200; }
+
+  /* Scoreboard */
+  .scoreboard { list-style: none; }
+  .scoreboard li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    background: rgba(255,255,255,.06);
+  }
+  .scoreboard li:first-child { background: rgba(255,210,0,.12); border: 1px solid rgba(255,210,0,.3); }
+  .rank { font-size: 1.2rem; min-width: 28px; text-align: center; }
+  .sc-name { flex: 1; font-weight: 600; }
+  .sc-score { font-weight: 900; font-size: 1.1rem; color: #ffd200; }
+
+  .error-msg { color: #e74c3c; font-size: .85rem; text-align: center; margin-top: 8px; }
+
+  .submitted-badge {
+    display: inline-block;
+    background: rgba(56,239,125,.2);
+    color: #38ef7d;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: .75rem;
+    margin-right: auto;
+  }
+
+  @media (max-width: 480px) {
+    h1 { font-size: 1.8rem; }
+    .letter-display .letter { font-size: 4rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div id="screen-home" class="screen active">
+  <h1>إنسان حيوان شيء</h1>
+  <p class="subtitle">مدينة · دولة · مع أصدقائك أونلاين</p>
+
+  <div class="card">
+    <label>اسمك</label>
+    <input type="text" id="home-name" placeholder="أدخل اسمك" maxlength="20">
+    <button class="btn-primary" onclick="createRoom()">إنشاء غرفة جديدة</button>
+  </div>
+
+  <div class="divider">أو</div>
+
+  <div class="card">
+    <label>انضم لغرفة موجودة</label>
+    <input type="text" id="join-name" placeholder="اسمك" maxlength="20">
+    <input type="text" id="join-code" placeholder="كود الغرفة (مثل: AB1C2)" maxlength="6" style="text-transform:uppercase">
+    <button class="btn-secondary" onclick="joinRoom()">انضمام</button>
+    <div id="home-error" class="error-msg"></div>
+  </div>
+</div>
+
+<!-- LOBBY -->
+<div id="screen-lobby" class="screen">
+  <h1>إنسان حيوان شيء</h1>
+
+  <div class="room-code-box">
+    <div class="label">كود الغرفة — شاركه مع أصدقائك</div>
+    <div class="code" id="lobby-code">——</div>
+    <div class="hint">أو شارك الرابط: <span id="lobby-url" style="color:#ffd200;word-break:break-all"></span></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-weight:700">اللاعبون</span>
+      <span id="lobby-rounds-info" style="color:#aaa;font-size:.85rem"></span>
+    </div>
+    <ul class="player-list" id="lobby-players"></ul>
+  </div>
+
+  <div id="lobby-host-controls" style="display:none">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+      <label style="margin:0;white-space:nowrap">عدد الجولات:</label>
+      <input type="number" id="rounds-input" value="5" min="1" max="10" style="width:80px;margin:0">
+    </div>
+    <button class="btn-success" onclick="startGame()">ابدأ اللعبة!</button>
+  </div>
+  <div id="lobby-waiting-msg" style="text-align:center;color:#aaa;display:none">في انتظار المضيف لبدء اللعبة...</div>
+</div>
+
+<!-- GAME -->
+<div id="screen-game" class="screen">
+  <div class="letter-display">
+    <div class="letter" id="game-letter">?</div>
+    <div class="round-info" id="game-round-info"></div>
+  </div>
+
+  <div class="timer-count" id="timer-count">⏱ 60</div>
+  <div class="timer-bar-wrap">
+    <div class="timer-bar" id="timer-bar" style="width:100%"></div>
+  </div>
+
+  <div class="card">
+    <div class="cat-inputs" id="cat-inputs"></div>
+  </div>
+
+  <button class="btn-primary" id="submit-btn" onclick="submitAnswers()">إرسال الإجابات ✓</button>
+  <div id="submitted-msg" style="text-align:center;color:#38ef7d;margin-top:10px;display:none">تم الإرسال! في انتظار الآخرين...</div>
+</div>
+
+<!-- SCORING -->
+<div id="screen-scoring" class="screen">
+  <h1 style="font-size:1.6rem;margin-bottom:4px">نتائج الجولة</h1>
+  <p class="subtitle" id="scoring-letter-info"></p>
+
+  <div class="card answers-grid" id="scoring-answers"></div>
+
+  <div class="card" style="margin-top:16px">
+    <div style="font-weight:700;margin-bottom:12px">الترتيب</div>
+    <ul class="scoreboard" id="scoring-board"></ul>
+  </div>
+
+  <div id="scoring-host-controls" style="display:none">
+    <button class="btn-primary" id="next-round-btn" onclick="nextRound()" style="margin-top:8px">الجولة التالية ←</button>
+  </div>
+  <div id="scoring-wait-msg" style="text-align:center;color:#aaa;margin-top:12px;display:none">في انتظار المضيف للمتابعة...</div>
+</div>
+
+<!-- GAME OVER -->
+<div id="screen-gameover" class="screen">
+  <h1 style="margin-bottom:4px">انتهت اللعبة! 🎉</h1>
+  <p class="subtitle">الترتيب النهائي</p>
+
+  <div class="card">
+    <ul class="scoreboard" id="gameover-board"></ul>
+  </div>
+
+  <div id="gameover-host-controls" style="display:none">
+    <button class="btn-success" onclick="playAgain()">العب مجدداً</button>
+  </div>
+  <div id="gameover-wait-msg" style="text-align:center;color:#aaa;margin-top:12px;display:none">في انتظار المضيف...</div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+  let myId = null;
+  let isHost = false;
+  let currentCategories = [];
+  let roundDuration = 60;
+  let roundTotal = 5;
+
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + id).classList.add('active');
+  }
+
+  function setError(msg) {
+    document.getElementById('home-error').textContent = msg;
+  }
+
+  function createRoom() {
+    const name = document.getElementById('home-name').value.trim();
+    if (!name) return setError('أدخل اسمك أولاً');
+    setError('');
+    socket.emit('create_room', { name, rounds: 5 });
+  }
+
+  function joinRoom() {
+    const name = document.getElementById('join-name').value.trim();
+    const roomId = document.getElementById('join-code').value.trim().toUpperCase();
+    if (!name) return setError('أدخل اسمك أولاً');
+    if (!roomId) return setError('أدخل كود الغرفة');
+    setError('');
+    socket.emit('join_room', { roomId, name });
+  }
+
+  function startGame() {
+    const rounds = parseInt(document.getElementById('rounds-input').value) || 5;
+    socket.emit('update_rounds', { rounds }); // handled gracefully server-side
+    socket.emit('start_game');
+  }
+
+  function submitAnswers() {
+    const answers = {};
+    currentCategories.forEach(cat => {
+      const el = document.getElementById('ans-' + cat);
+      answers[cat] = el ? el.value.trim() : '';
+    });
+    socket.emit('submit_answers', { answers });
+    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('submitted-msg').style.display = 'block';
+  }
+
+  function nextRound() {
+    socket.emit('next_round');
+  }
+
+  function playAgain() {
+    socket.emit('play_again');
+  }
+
+  function renderLobby(data) {
+    document.getElementById('lobby-code').textContent = data.roomId;
+    document.getElementById('lobby-url').textContent = window.location.origin + '?room=' + data.roomId;
+    document.getElementById('lobby-rounds-info').textContent = data.rounds + ' جولات';
+    roundTotal = data.rounds;
+
+    const ul = document.getElementById('lobby-players');
+    ul.innerHTML = '';
+    data.players.forEach(p => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="crown">${p.isHost ? '👑' : '👤'}</span> ${p.name}${p.id === myId ? ' (أنت)' : ''}`;
+      ul.appendChild(li);
+    });
+
+    const hostControls = document.getElementById('lobby-host-controls');
+    const waitMsg = document.getElementById('lobby-waiting-msg');
+    if (isHost) {
+      hostControls.style.display = 'block';
+      waitMsg.style.display = 'none';
+    } else {
+      hostControls.style.display = 'none';
+      waitMsg.style.display = 'block';
+    }
+  }
+
+  function renderScoring(data) {
+    document.getElementById('scoring-letter-info').textContent = 'الحرف: ' + data.letter + ' | الجولة ' + data.round + ' من ' + data.total;
+
+    // Answers per category
+    const grid = document.getElementById('scoring-answers');
+    grid.innerHTML = '';
+    data.categories.forEach(cat => {
+      const div = document.createElement('div');
+      div.className = 'cat-result';
+      div.innerHTML = `<h4>${cat}</h4>`;
+      const rows = document.createElement('div');
+      rows.className = 'answer-rows';
+
+      data.players.forEach(p => {
+        const ans = (data.answers[p.id]?.[cat] || '').trim();
+        const pts = data.roundScores[p.id] !== undefined ? null : 0;
+        const row = document.createElement('div');
+
+        // Determine uniqueness
+        const val = ans.toLowerCase();
+        const countSame = Object.values(data.answers)
+          .map(a => (a[cat] || '').trim().toLowerCase())
+          .filter(v => v && v === val).length;
+
+        if (!ans) {
+          row.className = 'answer-row empty';
+          row.innerHTML = `<span>${data.playerNames[p.id]}</span><span>—</span>`;
+        } else if (countSame === 1) {
+          row.className = 'answer-row unique';
+          row.innerHTML = `<span>${data.playerNames[p.id]}: <b>${ans}</b></span><span class="pts">+10</span>`;
+        } else {
+          row.className = 'answer-row shared';
+          row.innerHTML = `<span>${data.playerNames[p.id]}: <b>${ans}</b></span><span class="pts shared">+5</span>`;
+        }
+        rows.appendChild(row);
+      });
+
+      div.appendChild(rows);
+      grid.appendChild(div);
+    });
+
+    // Scoreboard
+    renderScoreboard('scoring-board', data.players);
+
+    const hostCtrl = document.getElementById('scoring-host-controls');
+    const waitMsg = document.getElementById('scoring-wait-msg');
+    const nextBtn = document.getElementById('next-round-btn');
+    if (isHost) {
+      hostCtrl.style.display = 'block';
+      waitMsg.style.display = 'none';
+      nextBtn.textContent = data.round >= data.total ? 'عرض النتيجة النهائية' : 'الجولة التالية ←';
+    } else {
+      hostCtrl.style.display = 'none';
+      waitMsg.style.display = 'block';
+    }
+  }
+
+  function renderScoreboard(elId, players) {
+    const medals = ['🥇','🥈','🥉'];
+    const ul = document.getElementById(elId);
+    ul.innerHTML = '';
+    players.forEach((p, i) => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <span class="rank">${medals[i] || (i+1)}</span>
+        <span class="sc-name">${p.name}${p.id === myId ? ' (أنت)' : ''}</span>
+        <span class="sc-score">${p.totalScore}</span>
+      `;
+      ul.appendChild(li);
+    });
+  }
+
+  // Socket events
+  socket.on('room_created', ({ roomId, playerId }) => {
+    myId = playerId;
+    isHost = true;
+    show('lobby');
+  });
+
+  socket.on('room_joined', ({ roomId, playerId }) => {
+    myId = playerId;
+    isHost = false;
+    show('lobby');
+  });
+
+  socket.on('error', (msg) => {
+    setError(msg);
+  });
+
+  socket.on('lobby_update', (data) => {
+    if (document.getElementById('screen-lobby').classList.contains('active')) {
+      renderLobby(data);
+    } else {
+      show('lobby');
+      renderLobby(data);
+    }
+    // Update isHost
+    const me = data.players.find(p => p.id === myId);
+    if (me) isHost = me.isHost;
+  });
+
+  socket.on('round_start', (data) => {
+    currentCategories = data.categories;
+    roundDuration = data.timeLeft;
+    roundTotal = data.total;
+
+    document.getElementById('game-letter').textContent = data.letter;
+    document.getElementById('game-round-info').textContent = 'الجولة ' + data.round + ' من ' + data.total;
+    document.getElementById('timer-count').textContent = '⏱ ' + data.timeLeft;
+    document.getElementById('timer-bar').style.width = '100%';
+    document.getElementById('timer-bar').classList.remove('urgent');
+    document.getElementById('submit-btn').disabled = false;
+    document.getElementById('submitted-msg').style.display = 'none';
+
+    const inputs = document.getElementById('cat-inputs');
+    inputs.innerHTML = '';
+    data.categories.forEach(cat => {
+      const row = document.createElement('div');
+      row.className = 'cat-row';
+      row.innerHTML = `
+        <div class="cat-label">${cat}</div>
+        <input type="text" id="ans-${cat}" placeholder="${cat} يبدأ بـ ${data.letter}" maxlength="30">
+      `;
+      inputs.appendChild(row);
+    });
+
+    show('game');
+  });
+
+  socket.on('tick', ({ timeLeft }) => {
+    document.getElementById('timer-count').textContent = '⏱ ' + timeLeft;
+    const pct = (timeLeft / roundDuration) * 100;
+    const bar = document.getElementById('timer-bar');
+    bar.style.width = pct + '%';
+    if (timeLeft <= 15) bar.classList.add('urgent');
+  });
+
+  socket.on('round_end', (data) => {
+    renderScoring(data);
+    show('scoring');
+  });
+
+  socket.on('game_over', (data) => {
+    renderScoreboard('gameover-board', data.players);
+    const hostCtrl = document.getElementById('gameover-host-controls');
+    const waitMsg = document.getElementById('gameover-wait-msg');
+    if (isHost) {
+      hostCtrl.style.display = 'block';
+      waitMsg.style.display = 'none';
+    } else {
+      hostCtrl.style.display = 'none';
+      waitMsg.style.display = 'block';
+    }
+    show('gameover');
+  });
+
+  // Auto-join from URL
+  window.addEventListener('load', () => {
+    const params = new URLSearchParams(window.location.search);
+    const room = params.get('room');
+    if (room) {
+      document.getElementById('join-code').value = room.toUpperCase();
+    }
+  });
+</script>
+</body>
+</html>
