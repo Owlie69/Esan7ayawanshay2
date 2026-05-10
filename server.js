@@ -28,6 +28,8 @@ function makeRoom(roomId) {
     scores: {},
     roundsToPlay: 5,
     usedLetters: [],
+    voidedAnswers: {},   // { playerId: { category: true } }
+    lastRoundScores: {}, // scores added in the current scoring phase
   };
 }
 
@@ -68,40 +70,31 @@ function startRound(roomId) {
   }, 1000);
 }
 
-function endRound(roomId) {
-  const room = rooms[roomId];
-  if (!room || room.state !== 'playing') return;
-  clearInterval(room.timer);
-  room.state = 'scoring';
-
-  // Calculate scores for this round
+function calcRoundScores(room) {
   const roundScores = {};
-  for (const pid of Object.keys(room.players)) {
-    roundScores[pid] = 0;
-  }
+  for (const pid of Object.keys(room.players)) roundScores[pid] = 0;
 
   for (const cat of CATEGORIES) {
     const answerMap = {};
     for (const [pid, ans] of Object.entries(room.answers)) {
+      if (room.voidedAnswers[pid]?.[cat]) continue; // skip voided
       const val = (ans[cat] || '').trim().toLowerCase();
       if (!val) continue;
       answerMap[pid] = val;
     }
 
-    // Count how many players gave each answer
     const freq = {};
-    for (const v of Object.values(answerMap)) {
-      freq[v] = (freq[v] || 0) + 1;
-    }
-
+    for (const v of Object.values(answerMap)) freq[v] = (freq[v] || 0) + 1;
     for (const [pid, val] of Object.entries(answerMap)) {
       roundScores[pid] += freq[val] === 1 ? 10 : 5;
     }
   }
+  return roundScores;
+}
 
-  for (const pid of Object.keys(room.players)) {
-    room.scores[pid] = (room.scores[pid] || 0) + roundScores[pid];
-  }
+function emitRoundEnd(roomId) {
+  const room = rooms[roomId];
+  const roundScores = room.lastRoundScores;
 
   const playersInfo = Object.entries(room.players).map(([pid, p]) => ({
     id: pid,
@@ -114,6 +107,7 @@ function endRound(roomId) {
     letter: room.letter,
     categories: CATEGORIES,
     answers: room.answers,
+    voidedAnswers: room.voidedAnswers,
     playerNames: Object.fromEntries(Object.entries(room.players).map(([id, p]) => [id, p.name])),
     roundScores,
     players: playersInfo,
@@ -121,10 +115,28 @@ function endRound(roomId) {
     total: room.roundsToPlay,
   });
 
-  if (room.round >= room.roundsToPlay) {
-    room.state = 'finished';
+  if (room.state === 'finished') {
     io.to(roomId).emit('game_over', { players: playersInfo });
   }
+}
+
+function endRound(roomId) {
+  const room = rooms[roomId];
+  if (!room || room.state !== 'playing') return;
+  clearInterval(room.timer);
+  room.state = 'scoring';
+  room.voidedAnswers = {};
+
+  const roundScores = calcRoundScores(room);
+  room.lastRoundScores = { ...roundScores };
+
+  for (const pid of Object.keys(room.players)) {
+    room.scores[pid] = (room.scores[pid] || 0) + (roundScores[pid] || 0);
+  }
+
+  if (room.round >= room.roundsToPlay) room.state = 'finished';
+
+  emitRoundEnd(roomId);
 }
 
 io.on('connection', (socket) => {
@@ -169,6 +181,26 @@ io.on('connection', (socket) => {
     // If all players submitted, end round early
     const allIn = Object.keys(room.players).every(pid => Object.keys(room.answers[pid] || {}).length > 0);
     if (allIn) endRound(socket.data.roomId);
+  });
+
+  socket.on('void_answer', ({ playerId, category }) => {
+    const room = rooms[socket.data.roomId];
+    if (!room || room.state !== 'scoring') return;
+    if (!room.players[socket.id]?.isHost) return;
+
+    if (!room.voidedAnswers[playerId]) room.voidedAnswers[playerId] = {};
+    room.voidedAnswers[playerId][category] = true;
+
+    // Recalculate and update cumulative scores
+    const newScores = calcRoundScores(room);
+    for (const pid of Object.keys(room.players)) {
+      room.scores[pid] = (room.scores[pid] || 0)
+        - (room.lastRoundScores[pid] || 0)
+        + (newScores[pid] || 0);
+    }
+    room.lastRoundScores = { ...newScores };
+
+    emitRoundEnd(socket.data.roomId);
   });
 
   socket.on('next_round', () => {

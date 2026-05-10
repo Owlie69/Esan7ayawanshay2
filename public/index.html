@@ -218,19 +218,20 @@
   }
   .timer-count.ticking { animation: tickBump 0.35s ease-out; }
 
-  .ans-wrap { display: flex; align-items: center; gap: 6px; }
-  .ans-wrap input { flex: 1; }
-  .ans-clear {
-    flex-shrink: 0;
+  .void-btn {
     background: rgba(231,76,60,.2);
     border: 1px solid rgba(231,76,60,.45);
     color: #e74c3c;
     border-radius: 6px;
-    width: 30px; height: 30px;
-    font-size: 1rem; font-weight: 700;
-    cursor: pointer; line-height: 1;
+    padding: 2px 7px;
+    font-size: .8rem; font-weight: 700;
+    cursor: pointer; line-height: 1.4;
+    margin-right: auto;
   }
-  .ans-clear:hover { background: rgba(231,76,60,.45); }
+  .void-btn:hover { background: rgba(231,76,60,.5); }
+  .answer-row.voided { opacity: .5; }
+  .answer-row.voided b { text-decoration: line-through; }
+  .voided-pts { color: #e74c3c; font-size: .8rem; }
 
   .submitted-badge {
     display: inline-block;
@@ -419,9 +420,8 @@
     document.getElementById('submitted-msg').style.display = 'block';
   }
 
-  function clearAnswer(cat) {
-    const el = document.getElementById('ans-' + cat);
-    if (el) { el.value = ''; el.focus(); }
+  function voidAnswer(playerId, category) {
+    socket.emit('void_answer', { playerId, category });
   }
 
   function nextRound() {
@@ -481,15 +481,23 @@
           .map(a => (a[cat] || '').trim().toLowerCase())
           .filter(v => v && v === val).length;
 
+        const voided = data.voidedAnswers?.[p.id]?.[cat];
+        const voidBtn = isHost && ans && !voided
+          ? `<button class="void-btn" onclick="voidAnswer('${p.id}','${cat}')" title="إلغاء الإجابة">✕</button>`
+          : '';
+
         if (!ans) {
           row.className = 'answer-row empty';
           row.innerHTML = `<span>${data.playerNames[p.id]}</span><span>—</span>`;
+        } else if (voided) {
+          row.className = 'answer-row voided';
+          row.innerHTML = `<span>${data.playerNames[p.id]}: <b>${ans}</b></span><span class="pts voided-pts">ملغاة</span>`;
         } else if (countSame === 1) {
           row.className = 'answer-row unique';
-          row.innerHTML = `<span>${data.playerNames[p.id]}: <b>${ans}</b></span><span class="pts">+10</span>`;
+          row.innerHTML = `<span>${data.playerNames[p.id]}: <b>${ans}</b></span><span class="pts">+10</span>${voidBtn}`;
         } else {
           row.className = 'answer-row shared';
-          row.innerHTML = `<span>${data.playerNames[p.id]}: <b>${ans}</b></span><span class="pts shared">+5</span>`;
+          row.innerHTML = `<span>${data.playerNames[p.id]}: <b>${ans}</b></span><span class="pts shared">+5</span>${voidBtn}`;
         }
         rows.appendChild(row);
       });
@@ -583,10 +591,7 @@
       row.className = 'cat-row';
       row.innerHTML = `
         <div class="cat-label">${cat}</div>
-        <div class="ans-wrap">
-          <input type="text" id="ans-${cat}" placeholder="${cat} يبدأ بـ ${data.letter}" maxlength="30">
-          <button class="ans-clear" type="button" onclick="clearAnswer('${cat}')" title="مسح الإجابة">×</button>
-        </div>
+        <input type="text" id="ans-${cat}" placeholder="${cat} يبدأ بـ ${data.letter}" maxlength="30">
       `;
       inputs.appendChild(row);
     });
