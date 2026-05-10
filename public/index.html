@@ -230,6 +230,15 @@
 </head>
 <body>
 
+<!-- Connection banner -->
+<div id="conn-banner" style="
+  position:fixed;top:0;left:0;right:0;z-index:999;
+  padding:10px;text-align:center;font-size:.85rem;
+  background:#c0392b;color:#fff;display:none;
+">
+  ⚠️ لا يوجد اتصال بالخادم. تأكد أن السيرفر شغّال أو حدّث <code>BACKEND_URL</code> في الكود.
+</div>
+
 <!-- HOME -->
 <div id="screen-home" class="screen active">
   <h1>إنسان حيوان شيء</h1>
@@ -333,9 +342,15 @@
   <div id="gameover-wait-msg" style="text-align:center;color:#aaa;margin-top:12px;display:none">في انتظار المضيف...</div>
 </div>
 
-<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
-  const socket = io();
+  // When hosted on Railway/Render/etc the page IS the server — use same origin.
+  // When the HTML is opened from a different host (GitHub Pages, local file, etc.)
+  // set BACKEND_URL below to your deployed server URL, e.g.:
+  //   const BACKEND_URL = 'https://your-app.up.railway.app';
+  const BACKEND_URL = null; // null = same origin
+
+  const socket = io(BACKEND_URL || window.location.origin, { transports: ['websocket', 'polling'] });
   let myId = null;
   let isHost = false;
   let currentCategories = [];
@@ -488,6 +503,11 @@
       ul.appendChild(li);
     });
   }
+
+  // Connection status
+  socket.on('connect', () => { document.getElementById('conn-banner').style.display = 'none'; });
+  socket.on('disconnect', () => { document.getElementById('conn-banner').style.display = 'block'; });
+  socket.on('connect_error', () => { document.getElementById('conn-banner').style.display = 'block'; });
 
   // Socket events
   socket.on('room_created', ({ roomId, playerId }) => {
