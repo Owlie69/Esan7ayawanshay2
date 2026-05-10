@@ -243,6 +243,29 @@
     margin-right: auto;
   }
 
+  .btn-secondary {
+    display: block; width: 100%;
+    padding: 14px; border-radius: 12px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.18);
+    color: #fff; font-size: 1rem; font-weight: 600;
+    cursor: pointer; margin-top: 10px; text-align: center;
+  }
+  .btn-secondary:hover { background: rgba(255,255,255,.15); }
+
+  .diff-btns { display: flex; gap: 8px; margin-top: 8px; }
+  .diff-btn {
+    flex: 1; padding: 14px 6px; border-radius: 10px;
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.12);
+    color: #ccc; font-size: .95rem; cursor: pointer;
+  }
+  .diff-btn.active {
+    background: rgba(255,210,0,.18);
+    border-color: rgba(255,210,0,.6);
+    color: #ffd200; font-weight: 700;
+  }
+
   @media (max-width: 480px) {
     h1 { font-size: 1.8rem; }
     .letter-display .letter { font-size: 4rem; }
@@ -280,6 +303,36 @@
     <button class="btn-secondary" onclick="joinRoom()">انضمام</button>
     <div id="home-error" class="error-msg"></div>
   </div>
+
+  <div class="divider">أو</div>
+
+  <button class="btn-secondary" style="font-size:1.05rem" onclick="show('bot-setup')">العب ضد الروبوتات 🤖</button>
+</div>
+
+<!-- BOT SETUP -->
+<div id="screen-bot-setup" class="screen">
+  <h1>وضع الروبوتات 🤖</h1>
+  <p class="subtitle">العب ضد ٣ روبوتات بمفردك</p>
+
+  <div class="card">
+    <label>اسمك</label>
+    <input type="text" id="bot-name" placeholder="أدخل اسمك" maxlength="20">
+
+    <label style="margin-top:18px;display:block">مستوى الصعوبة</label>
+    <div class="diff-btns">
+      <button class="diff-btn active" data-diff="easy"   onclick="selectDiff('easy')">سهل 😊</button>
+      <button class="diff-btn"        data-diff="medium" onclick="selectDiff('medium')">متوسط 🤔</button>
+      <button class="diff-btn"        data-diff="hard"   onclick="selectDiff('hard')">صعب 😈</button>
+    </div>
+
+    <label style="margin-top:18px;display:block">عدد الجولات</label>
+    <input type="number" id="bot-rounds" value="3" min="1" max="10" style="width:80px;margin-top:6px">
+
+    <button class="btn-primary" style="margin-top:20px" onclick="startBotGame()">ابدأ اللعبة!</button>
+    <div id="bot-error" class="error-msg"></div>
+  </div>
+
+  <button class="btn-secondary" style="margin-top:10px" onclick="show('home')">← رجوع</button>
 </div>
 
 <!-- LOBBY -->
@@ -374,6 +427,8 @@
   const socket = io(BACKEND_URL || window.location.origin, { transports: ['websocket', 'polling'] });
   let myId = null;
   let isHost = false;
+  let isBotGame = false;
+  let selectedDiff = 'easy';
   let currentCategories = [];
   let roundDuration = 60;
   let roundTotal = 5;
@@ -385,6 +440,24 @@
 
   function setError(msg) {
     document.getElementById('home-error').textContent = msg;
+  }
+
+  function selectDiff(d) {
+    selectedDiff = d;
+    document.querySelectorAll('.diff-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.diff === d)
+    );
+  }
+
+  function startBotGame() {
+    const name = document.getElementById('bot-name').value.trim();
+    if (!name) {
+      document.getElementById('bot-error').textContent = 'أدخل اسمك أولاً';
+      return;
+    }
+    document.getElementById('bot-error').textContent = '';
+    const rounds = parseInt(document.getElementById('bot-rounds').value) || 3;
+    socket.emit('create_bot_game', { name, difficulty: selectedDiff, rounds });
   }
 
   function createRoom() {
@@ -544,14 +617,17 @@
 
   // Socket events
   socket.on('room_created', ({ roomId, playerId }) => {
-    myId = playerId;
-    isHost = true;
+    myId = playerId; isHost = true; isBotGame = false;
     show('lobby');
   });
 
+  socket.on('bot_game_created', ({ playerId }) => {
+    myId = playerId; isHost = true; isBotGame = true;
+    // stay on bot-setup; round_start will navigate to game
+  });
+
   socket.on('room_joined', ({ roomId, playerId }) => {
-    myId = playerId;
-    isHost = false;
+    myId = playerId; isHost = false; isBotGame = false;
     show('lobby');
   });
 
