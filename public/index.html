@@ -266,6 +266,36 @@
     color: #ffd200; font-weight: 700;
   }
 
+  /* Dialect chips */
+  .dialect-chips {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; margin-bottom: 4px;
+  }
+  .dialect-chip {
+    width: auto; padding: 7px 14px; border-radius: 20px;
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.15);
+    color: #aaa; font-size: .85rem; cursor: pointer; transition: all .15s;
+  }
+  .dialect-chip.active {
+    background: rgba(255,210,0,.18);
+    border-color: rgba(255,210,0,.6);
+    color: #ffd200; font-weight: 700;
+  }
+  .dialect-chip.locked { cursor: default; opacity: .7; }
+  .dialect-chip:hover:not(.locked) { background: rgba(255,255,255,.14); }
+
+  /* Matchmaking */
+  .mq-spinner {
+    width: 52px; height: 52px; margin: 20px auto;
+    border: 5px solid rgba(255,255,255,.1);
+    border-top-color: #ffd200;
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .mq-status { text-align: center; color: #aaa; font-size: .95rem; margin-bottom: 4px; }
+  .mq-count  { text-align: center; color: #ffd200; font-size: .85rem; }
+
   @media (max-width: 480px) {
     h1 { font-size: 1.8rem; }
     .letter-display .letter { font-size: 4rem; }
@@ -306,7 +336,24 @@
 
   <div class="divider">أو</div>
 
-  <button class="btn-secondary" style="font-size:1.05rem" onclick="show('bot-setup')">العب ضد الروبوتات 🤖</button>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <button class="btn-secondary" style="font-size:1.05rem" onclick="joinMatchmaking()">🌐 لعب أونلاين مع غرباء</button>
+    <button class="btn-secondary" style="font-size:1.05rem" onclick="show('bot-setup')">العب ضد الروبوتات 🤖</button>
+  </div>
+</div>
+
+<!-- MATCHMAKING -->
+<div id="screen-matchmaking" class="screen">
+  <h1>البحث عن لاعبين</h1>
+  <p class="subtitle">يتم البحث عن لاعبين آخرين...</p>
+
+  <div class="card" style="text-align:center;padding:32px">
+    <div class="mq-spinner"></div>
+    <p class="mq-status" id="mq-status">جاري البحث...</p>
+    <p class="mq-count" id="mq-count"></p>
+  </div>
+
+  <button class="btn-secondary" style="margin-top:10px" onclick="cancelMatchmaking()">← إلغاء</button>
 </div>
 
 <!-- BOT SETUP -->
@@ -324,6 +371,9 @@
       <button class="diff-btn"        data-diff="medium" onclick="selectDiff('medium')">متوسط 🤔</button>
       <button class="diff-btn"        data-diff="hard"   onclick="selectDiff('hard')">صعب 😈</button>
     </div>
+
+    <label style="margin-top:18px;display:block;color:#ccc;font-size:.85rem">اللغة / اللهجة</label>
+    <div class="dialect-chips" id="bot-dialects"></div>
 
     <label style="margin-top:18px;display:block">عدد الجولات</label>
     <input type="number" id="bot-rounds" value="3" min="1" max="10" style="width:80px;margin-top:6px">
@@ -358,7 +408,9 @@
       <label style="margin:0;white-space:nowrap">عدد الجولات:</label>
       <input type="number" id="rounds-input" value="5" min="1" max="10" style="width:80px;margin:0">
     </div>
-    <button class="btn-success" onclick="startGame()">ابدأ اللعبة!</button>
+    <label style="display:block;margin-bottom:6px;color:#ccc;font-size:.85rem">اللغة / اللهجة</label>
+    <div class="dialect-chips" id="lobby-dialects"></div>
+    <button class="btn-success" style="margin-top:14px" onclick="startGame()">ابدأ اللعبة!</button>
   </div>
   <div id="lobby-waiting-msg" style="text-align:center;color:#aaa;display:none">في انتظار المضيف لبدء اللعبة...</div>
 </div>
@@ -367,6 +419,7 @@
 <div id="screen-game" class="screen">
   <div class="letter-display">
     <div class="letter" id="game-letter">?</div>
+    <div id="game-phonetic" style="font-size:.9rem;color:#ffd200;opacity:.8;margin-top:2px;display:none"></div>
     <div class="round-info" id="game-round-info"></div>
   </div>
 
@@ -433,6 +486,13 @@
   let roundDuration = 60;
   let roundTotal = 5;
 
+  // XSS guard — escape all user-provided text before HTML insertion
+  function esc(s) {
+    return String(s ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
   function show(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById('screen-' + id).classList.add('active');
@@ -440,6 +500,42 @@
 
   function setError(msg) {
     document.getElementById('home-error').textContent = msg;
+  }
+
+  // ── Dialect chip helpers ──────────────────────────────────────────────────
+  const DIALECT_LABELS = {
+    msa: 'فصحى', egyptian: 'مصري 🇪🇬', gulf: 'خليجي 🇸🇦',
+    moroccan: 'مغربي 🇲🇦', levantine: 'شامي 🇱🇧',
+    english: 'English 🇬🇧', french: 'Français 🇫🇷',
+  };
+
+  function getSelectedDialects(groupId) {
+    return [...document.querySelectorAll(`#${groupId} .dialect-chip.active`)]
+      .map(b => b.dataset.dialect);
+  }
+
+  function toggleDialect(btn) {
+    const isMsa = btn.dataset.dialect === 'msa';
+    if (isMsa) return; // MSA always on
+    btn.classList.toggle('active');
+    // Ensure at least MSA stays
+    const group = btn.closest('.dialect-chips');
+    const anyActive = [...group.querySelectorAll('.dialect-chip.active')].length > 0;
+    if (!anyActive) btn.classList.add('active');
+  }
+
+  function buildDialectChips(groupId) {
+    const wrap = document.getElementById(groupId);
+    wrap.innerHTML = '';
+    for (const [key, label] of Object.entries(DIALECT_LABELS)) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dialect-chip' + (key === 'msa' ? ' active locked' : '');
+      b.dataset.dialect = key;
+      b.textContent = label;
+      b.onclick = () => toggleDialect(b);
+      wrap.appendChild(b);
+    }
   }
 
   function selectDiff(d) {
@@ -451,20 +547,18 @@
 
   function startBotGame() {
     const name = document.getElementById('bot-name').value.trim();
-    if (!name) {
-      document.getElementById('bot-error').textContent = 'أدخل اسمك أولاً';
-      return;
-    }
+    if (!name) { document.getElementById('bot-error').textContent = 'أدخل اسمك أولاً'; return; }
     document.getElementById('bot-error').textContent = '';
     const rounds = parseInt(document.getElementById('bot-rounds').value) || 3;
-    socket.emit('create_bot_game', { name, difficulty: selectedDiff, rounds });
+    const dialects = getSelectedDialects('bot-dialects');
+    socket.emit('create_bot_game', { name, difficulty: selectedDiff, rounds, dialects });
   }
 
   function createRoom() {
     const name = document.getElementById('home-name').value.trim();
     if (!name) return setError('أدخل اسمك أولاً');
     setError('');
-    socket.emit('create_room', { name, rounds: 5 });
+    socket.emit('create_room', { name, rounds: 5, dialects: ['msa'] });
   }
 
   function joinRoom() {
@@ -476,9 +570,24 @@
     socket.emit('join_room', { roomId, name });
   }
 
+  function joinMatchmaking() {
+    const name = document.getElementById('home-name').value.trim();
+    if (!name) return setError('أدخل اسمك أولاً');
+    setError('');
+    socket.emit('join_matchmaking', { name, dialects: ['msa'] });
+    show('matchmaking');
+  }
+
+  function cancelMatchmaking() {
+    socket.emit('cancel_matchmaking');
+    show('home');
+  }
+
   function startGame() {
     const rounds = parseInt(document.getElementById('rounds-input').value) || 5;
-    socket.emit('update_rounds', { rounds }); // handled gracefully server-side
+    const dialects = getSelectedDialects('lobby-dialects');
+    socket.emit('update_rounds', { rounds });
+    socket.emit('set_dialects', { dialects });
     socket.emit('start_game');
   }
 
@@ -493,8 +602,8 @@
     document.getElementById('submitted-msg').style.display = 'block';
   }
 
-  function voidAnswer(playerId, category) {
-    socket.emit('void_answer', { playerId, category });
+  function voidAnswer(btn) {
+    socket.emit('void_answer', { playerId: btn.dataset.pid, category: btn.dataset.cat });
   }
 
   function nextRound() {
@@ -515,7 +624,8 @@
     ul.innerHTML = '';
     data.players.forEach(p => {
       const li = document.createElement('li');
-      li.innerHTML = `<span class="crown">${p.isHost ? '👑' : '👤'}</span> ${p.name}${p.id === myId ? ' (أنت)' : ''}`;
+      const icon = p.isBot ? '🤖' : (p.isHost ? '👑' : '👤');
+      li.innerHTML = `<span class="crown">${icon}</span> ${esc(p.name)}${p.id === myId ? ' (أنت)' : ''}`;
       ul.appendChild(li);
     });
 
@@ -524,6 +634,9 @@
     if (isHost) {
       hostControls.style.display = 'block';
       waitMsg.style.display = 'none';
+      if (!document.getElementById('lobby-dialects').children.length) {
+        buildDialectChips('lobby-dialects');
+      }
     } else {
       hostControls.style.display = 'none';
       waitMsg.style.display = 'block';
@@ -555,22 +668,25 @@
           .filter(v => v && v === val).length;
 
         const voided = data.voidedAnswers?.[p.id]?.[cat];
+        // p.id comes from socket.id (server-generated), safe to inline in onclick
         const voidBtn = isHost && ans && !voided
-          ? `<button class="void-btn" onclick="voidAnswer('${p.id}','${cat}')" title="إلغاء الإجابة">✕</button>`
+          ? `<button class="void-btn" onclick="voidAnswer(this)" data-pid="${esc(p.id)}" data-cat="${esc(cat)}" title="إلغاء الإجابة">✕</button>`
           : '';
 
+        const name = esc(data.playerNames[p.id]);
+        const safeAns = esc(ans);
         if (!ans) {
           row.className = 'answer-row empty';
-          row.innerHTML = `<span>${data.playerNames[p.id]}</span><span>—</span>`;
+          row.innerHTML = `<span>${name}</span><span>—</span>`;
         } else if (voided) {
           row.className = 'answer-row voided';
-          row.innerHTML = `<span>${data.playerNames[p.id]}: <b>${ans}</b></span><span class="pts voided-pts">ملغاة</span>`;
+          row.innerHTML = `<span>${name}: <b>${safeAns}</b></span><span class="pts voided-pts">ملغاة</span>`;
         } else if (countSame === 1) {
           row.className = 'answer-row unique';
-          row.innerHTML = `<span>${data.playerNames[p.id]}: <b>${ans}</b></span><span class="pts">+10</span>${voidBtn}`;
+          row.innerHTML = `<span>${name}: <b>${safeAns}</b></span><span class="pts">+10</span>${voidBtn}`;
         } else {
           row.className = 'answer-row shared';
-          row.innerHTML = `<span>${data.playerNames[p.id]}: <b>${ans}</b></span><span class="pts shared">+5</span>${voidBtn}`;
+          row.innerHTML = `<span>${name}: <b>${safeAns}</b></span><span class="pts shared">+5</span>${voidBtn}`;
         }
         rows.appendChild(row);
       });
@@ -603,7 +719,7 @@
       const li = document.createElement('li');
       li.innerHTML = `
         <span class="rank">${medals[i] || (i+1)}</span>
-        <span class="sc-name">${p.name}${p.id === myId ? ' (أنت)' : ''}</span>
+        <span class="sc-name">${esc(p.name)}${p.id === myId ? ' (أنت)' : ''}</span>
         <span class="sc-score">${p.totalScore}</span>
       `;
       ul.appendChild(li);
@@ -654,6 +770,14 @@
 
     document.getElementById('game-letter').textContent = data.letter;
     document.getElementById('game-round-info').textContent = 'الجولة ' + data.round + ' من ' + data.total;
+
+    const phoneticEl = document.getElementById('game-phonetic');
+    if (data.hasLatinLang && data.phonetic) {
+      phoneticEl.textContent = '(' + data.phonetic + ')';
+      phoneticEl.style.display = 'block';
+    } else {
+      phoneticEl.style.display = 'none';
+    }
     document.getElementById('timer-count').textContent = '⏱ ' + data.timeLeft;
     document.getElementById('timer-bar').style.width = '100%';
     document.getElementById('timer-bar').classList.remove('urgent');
@@ -711,8 +835,21 @@
     show('gameover');
   });
 
+  socket.on('queue_update', ({ count }) => {
+    const el = document.getElementById('mq-count');
+    if (el) el.textContent = count > 1 ? `${count} لاعب في الانتظار` : 'في انتظار لاعبين آخرين...';
+  });
+
+  socket.on('matchmaking_found', ({ roomId, playerId, isHost: host }) => {
+    myId = playerId;
+    isHost = host;
+    isBotGame = false;
+    show('lobby');
+  });
+
   // Auto-join from URL
   window.addEventListener('load', () => {
+    buildDialectChips('bot-dialects');
     const params = new URLSearchParams(window.location.search);
     const room = params.get('room');
     if (room) {
