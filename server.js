@@ -8,6 +8,9 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
+app.get('*', (req, res) =>
+  res.sendFile(path.join(__dirname, 'public', 'index.html'))
+);
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 const ARABIC_LETTERS = ['ا','ب','ت','ث','ج','ح','خ','د','ذ','ر','ز','س','ش','ص','ض','ط','ع','غ','ف','ق','ك','ل','م','ن','ه','و','ي'];
