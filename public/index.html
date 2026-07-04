@@ -296,9 +296,64 @@
   .mq-status { text-align: center; color: #aaa; font-size: .95rem; margin-bottom: 4px; }
   .mq-count  { text-align: center; color: #ffd200; font-size: .85rem; }
 
+  /* Home tiles */
+  .home-tiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 4px;
+  }
+  .home-tile {
+    background: rgba(255,255,255,.07);
+    border: 1.5px solid rgba(255,255,255,.12);
+    border-radius: 20px;
+    padding: 30px 16px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform .15s, background .15s, border-color .15s, box-shadow .15s;
+    user-select: none;
+  }
+  .home-tile:hover { transform: translateY(-4px); }
+  .home-tile:active { transform: scale(.95); }
+  .tile-icon { font-size: 2.8rem; margin-bottom: 10px; line-height: 1; display: block; }
+  .tile-title { font-size: 1.1rem; font-weight: 800; margin-bottom: 5px; }
+  .tile-desc { font-size: .8rem; color: #aaa; }
+
+  .tile-create { border-color: rgba(255,210,0,.35); }
+  .tile-create:hover { border-color: rgba(255,210,0,.7); background: rgba(255,210,0,.09); box-shadow: 0 8px 24px rgba(255,210,0,.1); }
+  .tile-create .tile-title { color: #ffd200; }
+
+  .tile-join { border-color: rgba(56,239,125,.25); }
+  .tile-join:hover { border-color: rgba(56,239,125,.55); background: rgba(56,239,125,.07); box-shadow: 0 8px 24px rgba(56,239,125,.08); }
+  .tile-join .tile-title { color: #38ef7d; }
+  .tile-join.open { border-color: rgba(56,239,125,.55); background: rgba(56,239,125,.07); }
+
+  .tile-online { border-color: rgba(167,139,250,.3); }
+  .tile-online:hover { border-color: rgba(167,139,250,.65); background: rgba(167,139,250,.09); box-shadow: 0 8px 24px rgba(167,139,250,.1); }
+  .tile-online .tile-title { color: #a78bfa; }
+
+  .tile-bot { border-color: rgba(247,151,30,.25); }
+  .tile-bot:hover { border-color: rgba(247,151,30,.55); background: rgba(247,151,30,.07); box-shadow: 0 8px 24px rgba(247,151,30,.08); }
+  .tile-bot .tile-title { color: #f7971e; }
+
+  .join-panel {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height .35s ease, opacity .25s ease, margin .25s;
+    opacity: 0;
+    margin-top: 0;
+  }
+  .join-panel.open {
+    max-height: 160px;
+    opacity: 1;
+    margin-top: 14px;
+  }
+
   @media (max-width: 480px) {
     h1 { font-size: 1.8rem; }
     .letter-display .letter { font-size: 4rem; }
+    .tile-icon { font-size: 2.2rem; }
+    .tile-title { font-size: 1rem; }
   }
 </style>
 </head>
@@ -318,28 +373,41 @@
   <h1>إنسان حيوان شيء</h1>
   <p class="subtitle">مدينة · دولة · مع أصدقائك أونلاين</p>
 
-  <div class="card">
-    <label>اسمك</label>
-    <input type="text" id="home-name" placeholder="أدخل اسمك" maxlength="20">
-    <button class="btn-primary" onclick="createRoom()">إنشاء غرفة جديدة</button>
+  <div class="card" style="padding:14px 20px;margin-bottom:20px">
+    <input type="text" id="home-name" placeholder="✏️  أدخل اسمك أولاً..." maxlength="20" style="margin-bottom:0;font-size:1.05rem">
   </div>
 
-  <div class="divider">أو</div>
-
-  <div class="card">
-    <label>انضم لغرفة موجودة</label>
-    <input type="text" id="join-name" placeholder="اسمك" maxlength="20">
-    <input type="text" id="join-code" placeholder="كود الغرفة (مثل: AB1C2)" maxlength="6" style="text-transform:uppercase">
-    <button class="btn-secondary" onclick="joinRoom()">انضمام</button>
-    <div id="home-error" class="error-msg"></div>
+  <div class="home-tiles">
+    <div class="home-tile tile-create" onclick="createRoom()">
+      <span class="tile-icon">🏠</span>
+      <div class="tile-title">إنشاء غرفة</div>
+      <div class="tile-desc">ادعُ أصدقاءك</div>
+    </div>
+    <div class="home-tile tile-join" id="join-tile" onclick="toggleJoin()">
+      <span class="tile-icon">🔗</span>
+      <div class="tile-title">انضمام</div>
+      <div class="tile-desc">لديك كود غرفة</div>
+    </div>
+    <div class="home-tile tile-online" onclick="joinMatchmaking()">
+      <span class="tile-icon">🌐</span>
+      <div class="tile-title">أونلاين</div>
+      <div class="tile-desc">العب مع غرباء</div>
+    </div>
+    <div class="home-tile tile-bot" onclick="show('bot-setup')">
+      <span class="tile-icon">🤖</span>
+      <div class="tile-title">روبوتات</div>
+      <div class="tile-desc">العب بمفردك</div>
+    </div>
   </div>
 
-  <div class="divider">أو</div>
-
-  <div style="display:flex;flex-direction:column;gap:10px">
-    <button class="btn-secondary" style="font-size:1.05rem" onclick="joinMatchmaking()">🌐 لعب أونلاين مع غرباء</button>
-    <button class="btn-secondary" style="font-size:1.05rem" onclick="show('bot-setup')">العب ضد الروبوتات 🤖</button>
+  <div class="join-panel" id="join-panel">
+    <div class="card" style="padding:16px 20px">
+      <input type="text" id="join-code" placeholder="كود الغرفة (مثل: AB1C2)" maxlength="6" style="text-transform:uppercase;margin-bottom:10px">
+      <button class="btn-success" onclick="joinRoom()">انضمام ←</button>
+    </div>
   </div>
+
+  <div id="home-error" class="error-msg" style="margin-top:10px;text-align:center"></div>
 </div>
 
 <!-- MATCHMAKING -->
@@ -372,7 +440,7 @@
       <button class="diff-btn"        data-diff="hard"   onclick="selectDiff('hard')">صعب 😈</button>
     </div>
 
-    <label style="margin-top:18px;display:block;color:#ccc;font-size:.85rem">اللغة / اللهجة</label>
+    <label style="margin-top:18px;display:block;color:#ccc;font-size:.85rem">اللغة / اللهجة <span style="color:#ffd200;font-size:.8rem">← اختر واحدة أو أكثر</span></label>
     <div class="dialect-chips" id="bot-dialects"></div>
 
     <label style="margin-top:18px;display:block">عدد الجولات</label>
@@ -408,7 +476,7 @@
       <label style="margin:0;white-space:nowrap">عدد الجولات:</label>
       <input type="number" id="rounds-input" value="5" min="1" max="10" style="width:80px;margin:0">
     </div>
-    <label style="display:block;margin-bottom:6px;color:#ccc;font-size:.85rem">اللغة / اللهجة</label>
+    <label style="display:block;margin-bottom:6px;color:#ccc;font-size:.85rem">اللغة / اللهجة <span style="color:#ffd200;font-size:.8rem">← اختر واحدة أو أكثر</span></label>
     <div class="dialect-chips" id="lobby-dialects"></div>
     <button class="btn-success" style="margin-top:14px" onclick="startGame()">ابدأ اللعبة!</button>
   </div>
@@ -505,7 +573,7 @@
   // ── Dialect chip helpers ──────────────────────────────────────────────────
   const DIALECT_LABELS = {
     msa: 'فصحى', egyptian: 'مصري 🇪🇬', gulf: 'خليجي 🇸🇦',
-    moroccan: 'مغربي 🇲🇦', levantine: 'شامي 🇱🇧',
+    moroccan: 'مغربي 🇲🇦', levantine: 'لبناني 🇱🇧',
     english: 'English 🇬🇧', french: 'Français 🇫🇷',
   };
 
@@ -562,19 +630,28 @@
   }
 
   function joinRoom() {
-    const name = document.getElementById('join-name').value.trim();
+    const name   = document.getElementById('home-name').value.trim();
     const roomId = document.getElementById('join-code').value.trim().toUpperCase();
-    if (!name) return setError('أدخل اسمك أولاً');
+    if (!name)   return setError('أدخل اسمك أولاً');
     if (!roomId) return setError('أدخل كود الغرفة');
     setError('');
     socket.emit('join_room', { roomId, name });
+  }
+
+  function toggleJoin() {
+    const panel = document.getElementById('join-panel');
+    const tile  = document.getElementById('join-tile');
+    const open  = panel.classList.toggle('open');
+    tile.classList.toggle('open', open);
+    if (open) document.getElementById('join-code').focus();
   }
 
   function joinMatchmaking() {
     const name = document.getElementById('home-name').value.trim();
     if (!name) return setError('أدخل اسمك أولاً');
     setError('');
-    socket.emit('join_matchmaking', { name, dialects: ['msa'] });
+    const dialects = ['msa'];
+    socket.emit('join_matchmaking', { name, dialects });
     show('matchmaking');
   }
 
