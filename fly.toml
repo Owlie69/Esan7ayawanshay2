@@ -1,24 +1,29 @@
-# Replace "esan7ayawanshay2" below with whatever app name fly.io assigns you
-app = "esan7ayawanshay2"
-primary_region = "cdg"  # Paris — change to nearest region (e.g. "iad" US East, "lax" US West, "sin" Singapore)
+# fly.toml app configuration file generated for esan7ayawanshay2 on 2026-07-04T11:05:16Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'esan7ayawanshay2'
+primary_region = 'cdg'
 
 [build]
 
 [http_service]
   internal_port = 3000
   force_https = true
-  auto_stop_machines = false   # keep running even when idle — no sleep
+  auto_stop_machines = 'off'
   auto_start_machines = true
-  min_machines_running = 1     # always at least 1 instance running
+  min_machines_running = 1
 
   [[http_service.checks]]
-    grace_period = "30s"
-    interval = "30s"
-    method = "GET"
-    path = "/health"
-    timeout = "5s"
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '30s'
+    method = 'GET'
+    path = '/health'
 
 [[vm]]
-  memory = "256mb"
-  cpu_kind = "shared"
+  memory = '256mb'
+  cpu_kind = 'shared'
   cpus = 1
+  memory_mb = 256
