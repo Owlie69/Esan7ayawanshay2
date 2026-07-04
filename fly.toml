@@ -12,7 +12,7 @@ primary_region = "cdg"  # Paris — change to nearest region (e.g. "iad" US East
   min_machines_running = 1     # always at least 1 instance running
 
   [[http_service.checks]]
-    grace_period = "10s"
+    grace_period = "30s"
     interval = "30s"
     method = "GET"
     path = "/health"

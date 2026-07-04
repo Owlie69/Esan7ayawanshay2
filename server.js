@@ -999,4 +999,4 @@ process.on('uncaughtException', err => console.error('Uncaught exception:', err)
 process.on('unhandledRejection', reason => console.error('Unhandled rejection:', reason));
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Game running at http://localhost:${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`Game running at http://localhost:${PORT}`));
