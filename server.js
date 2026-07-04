@@ -5,10 +5,16 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  transports: ['websocket', 'polling'],
+  cors: { origin: '*' },
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('*', (req, res) =>
+app.get('/health', (_req, res) => res.send('OK'));
+app.get('*', (_req, res) =>
   res.sendFile(path.join(__dirname, 'public', 'index.html'))
 );
 
@@ -988,6 +994,9 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('lobby_update', lobbyInfo(room));
   });
 });
+
+process.on('uncaughtException', err => console.error('Uncaught exception:', err));
+process.on('unhandledRejection', reason => console.error('Unhandled rejection:', reason));
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Game running at http://localhost:${PORT}`));
