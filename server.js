@@ -558,6 +558,7 @@ function makeRoom(roomId) {
     lastRoundScores: {},
     isBotGame: false,
     dialects: ['msa'],
+    countdownTimer: null,
   };
 }
 
@@ -614,7 +615,13 @@ function submitBotAnswers(roomId, botId, answers) {
   room.answers[botId] = answers;
   room.submitted.add(botId);
   const allIn = Object.keys(room.players).every(pid => room.submitted.has(pid));
-  if (allIn) endRound(roomId);
+  if (allIn) {
+    if (room.countdownTimer) { clearTimeout(room.countdownTimer); room.countdownTimer = null; }
+    endRound(roomId);
+  } else if (room.submitted.size === 1 && !room.countdownTimer) {
+    io.to(roomId).emit('countdown_start', { seconds: 3 });
+    room.countdownTimer = setTimeout(() => endRound(roomId), 3000);
+  }
 }
 
 function scheduleBots(roomId) {
@@ -719,6 +726,7 @@ function emitRoundEnd(roomId) {
 function endRound(roomId) {
   const room = rooms[roomId];
   if (!room || room.state !== 'playing') return;
+  if (room.countdownTimer) { clearTimeout(room.countdownTimer); room.countdownTimer = null; }
   clearInterval(room.timer);
   room.state = 'scoring';
   room.voidedAnswers = {};
@@ -916,8 +924,15 @@ io.on('connection', (socket) => {
     }
     room.answers[socket.id] = safe;
     room.submitted.add(socket.id);
+    const roomId = socket.data.roomId;
     const allIn = Object.keys(room.players).every(pid => room.submitted.has(pid));
-    if (allIn) endRound(socket.data.roomId);
+    if (allIn) {
+      if (room.countdownTimer) { clearTimeout(room.countdownTimer); room.countdownTimer = null; }
+      endRound(roomId);
+    } else if (room.submitted.size === 1 && !room.countdownTimer) {
+      io.to(roomId).emit('countdown_start', { seconds: 3 });
+      room.countdownTimer = setTimeout(() => endRound(roomId), 3000);
+    }
   });
 
   socket.on('void_answer', ({ playerId, category }) => {

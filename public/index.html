@@ -284,6 +284,45 @@
   .dialect-chip.locked { cursor: default; opacity: .7; }
   .dialect-chip:hover:not(.locked) { background: rgba(255,255,255,.14); }
 
+  /* Countdown overlay */
+  #countdown-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,.82);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  #countdown-overlay.active { display: flex; }
+  #countdown-num {
+    font-size: 7rem; font-weight: 900; line-height: 1;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: cdbump .35s ease-out;
+  }
+  @keyframes cdbump {
+    0% { transform: scale(1.4); opacity: .5; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  #countdown-label { color: #ccc; font-size: 1rem; }
+
+  /* Scoring letter badge */
+  .scoring-letter-badge {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .scoring-letter-badge .big-letter {
+    font-size: 4rem; font-weight: 900; line-height: 1;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .scoring-letter-badge .round-label {
+    color: #aaa; font-size: .85rem; margin-top: 4px;
+  }
+
   /* Matchmaking */
   .mq-spinner {
     width: 52px; height: 52px; margin: 20px auto;
@@ -366,6 +405,12 @@
   background:#c0392b;color:#fff;display:none;
 ">
   ⚠️ لا يوجد اتصال بالخادم. تأكد أن السيرفر شغّال أو حدّث <code>BACKEND_URL</code> في الكود.
+</div>
+
+<!-- Countdown overlay (shown when first player submits) -->
+<div id="countdown-overlay">
+  <div id="countdown-num">3</div>
+  <div id="countdown-label">لاعب أرسل إجاباته — جاري الإنهاء...</div>
 </div>
 
 <!-- HOME -->
@@ -506,8 +551,10 @@
 
 <!-- SCORING -->
 <div id="screen-scoring" class="screen">
-  <h1 style="font-size:1.6rem;margin-bottom:4px">نتائج الجولة</h1>
-  <p class="subtitle" id="scoring-letter-info"></p>
+  <div class="scoring-letter-badge">
+    <div class="big-letter" id="scoring-big-letter">?</div>
+    <div class="round-label" id="scoring-round-label"></div>
+  </div>
 
   <div class="card answers-grid" id="scoring-answers"></div>
 
@@ -679,6 +726,22 @@
     document.getElementById('submitted-msg').style.display = 'block';
   }
 
+  function playBeep(freq, duration) {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq || 660;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (duration || 0.18));
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + (duration || 0.18));
+    } catch(e) {}
+  }
+
   function voidAnswer(btn) {
     socket.emit('void_answer', { playerId: btn.dataset.pid, category: btn.dataset.cat });
   }
@@ -721,7 +784,8 @@
   }
 
   function renderScoring(data) {
-    document.getElementById('scoring-letter-info').textContent = 'الحرف: ' + data.letter + ' | الجولة ' + data.round + ' من ' + data.total;
+    document.getElementById('scoring-big-letter').textContent = data.letter;
+    document.getElementById('scoring-round-label').textContent = 'الجولة ' + data.round + ' من ' + data.total;
 
     // Answers per category
     const grid = document.getElementById('scoring-answers');
@@ -893,7 +957,34 @@
     }
   });
 
+  socket.on('countdown_start', ({ seconds }) => {
+    const overlay = document.getElementById('countdown-overlay');
+    const numEl   = document.getElementById('countdown-num');
+    let count = seconds;
+    numEl.textContent = count;
+    overlay.classList.add('active');
+    playBeep(660);
+
+    const iv = setInterval(() => {
+      count--;
+      if (count <= 0) {
+        clearInterval(iv);
+        // Auto-submit typed answers if not yet submitted
+        if (!document.getElementById('submit-btn').disabled) submitAnswers();
+        overlay.classList.remove('active');
+        return;
+      }
+      // Restart bump animation
+      numEl.style.animation = 'none';
+      void numEl.offsetWidth;
+      numEl.style.animation = '';
+      numEl.textContent = count;
+      playBeep(count === 1 ? 880 : 660);
+    }, 1000);
+  });
+
   socket.on('round_end', (data) => {
+    document.getElementById('countdown-overlay').classList.remove('active');
     renderScoring(data);
     show('scoring');
   });
