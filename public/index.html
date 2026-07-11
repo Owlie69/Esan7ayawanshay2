@@ -284,6 +284,73 @@
   .dialect-chip.locked { cursor: default; opacity: .7; }
   .dialect-chip:hover:not(.locked) { background: rgba(255,255,255,.14); }
 
+  /* Chat */
+  #chat-toggle {
+    position: fixed; bottom: 20px; left: 20px; z-index: 150;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: rgba(255,255,255,.12); border: 1.5px solid rgba(255,255,255,.22);
+    font-size: 1.4rem; cursor: pointer; display: none;
+    align-items: center; justify-content: center; padding: 0;
+    transition: background .15s;
+  }
+  #chat-toggle:hover { background: rgba(255,255,255,.2); }
+  #chat-toggle.has-unread { border-color: #ffd200; }
+
+  #chat-panel {
+    position: fixed; bottom: 82px; left: 20px; width: 290px;
+    max-height: 400px; background: #1a1834;
+    border: 1px solid rgba(255,255,255,.14); border-radius: 16px;
+    display: flex; flex-direction: column; z-index: 150;
+    transform: scale(0); opacity: 0; pointer-events: none;
+    transition: transform .2s, opacity .2s;
+    transform-origin: bottom left;
+  }
+  #chat-panel.open { transform: scale(1); opacity: 1; pointer-events: all; }
+
+  #chat-messages {
+    flex: 1; overflow-y: auto; padding: 12px;
+    display: flex; flex-direction: column; gap: 8px;
+    max-height: 220px;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.15) transparent;
+  }
+  .chat-msg .msg-name { color: #ffd200; font-size: .78rem; font-weight: 700; margin-bottom: 2px; }
+  .chat-msg .msg-text { color: #ddd; font-size: .88rem; word-break: break-word; }
+  .chat-msg.mine .msg-name { color: #38ef7d; }
+
+  .voice-row {
+    display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+    border-top: 1px solid rgba(255,255,255,.08);
+  }
+  #voice-btn {
+    width: auto; padding: 7px 12px; border-radius: 8px; font-size: .82rem;
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); color: #fff;
+    transition: background .15s, border-color .15s;
+  }
+  #voice-btn.active { background: rgba(239,68,68,.25); border-color: rgba(239,68,68,.55); }
+  .voice-peers { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .voice-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: rgba(56,239,125,.35); transition: background .2s, box-shadow .2s;
+  }
+  .voice-dot.speaking { background: #38ef7d; box-shadow: 0 0 7px #38ef7d; }
+
+  .chat-input-row {
+    display: flex; gap: 6px; padding: 8px 12px;
+    border-top: 1px solid rgba(255,255,255,.08);
+  }
+  #chat-input {
+    flex: 1; background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.15); border-radius: 8px;
+    padding: 8px 10px; color: #fff; font-size: .85rem;
+    outline: none; width: auto; margin-bottom: 0; direction: rtl;
+  }
+  #chat-input:focus { border-color: #ffd200; }
+  #chat-send {
+    width: auto; padding: 8px 13px; border-radius: 8px;
+    background: linear-gradient(90deg,#f7971e,#ffd200); color: #111;
+    font-weight: 700; font-size: .9rem;
+  }
+
   /* Countdown overlay */
   #countdown-overlay {
     position: fixed; inset: 0; z-index: 200;
@@ -405,6 +472,23 @@
   background:#c0392b;color:#fff;display:none;
 ">
   ⚠️ لا يوجد اتصال بالخادم. تأكد أن السيرفر شغّال أو حدّث <code>BACKEND_URL</code> في الكود.
+</div>
+
+<!-- Chat toggle button -->
+<button id="chat-toggle" onclick="toggleChat()">💬</button>
+
+<!-- Chat panel -->
+<div id="chat-panel">
+  <div id="chat-messages"></div>
+  <div class="voice-row">
+    <button id="voice-btn" onclick="toggleVoice()">🎤 صوت</button>
+    <div class="voice-peers" id="voice-peers"></div>
+  </div>
+  <div class="chat-input-row">
+    <button id="chat-send" onclick="sendChat()">↑</button>
+    <input id="chat-input" placeholder="اكتب رسالة..." maxlength="200"
+      onkeydown="if(event.key==='Enter')sendChat()">
+  </div>
 </div>
 
 <!-- Countdown overlay (shown when first player submits) -->
@@ -726,6 +810,119 @@
     document.getElementById('submitted-msg').style.display = 'block';
   }
 
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  let chatOpen = false;
+
+  function setChatVisible(v) {
+    document.getElementById('chat-toggle').style.display = v ? 'flex' : 'none';
+    if (!v) { chatOpen = false; document.getElementById('chat-panel').classList.remove('open'); }
+  }
+
+  function toggleChat() {
+    chatOpen = !chatOpen;
+    document.getElementById('chat-panel').classList.toggle('open', chatOpen);
+    document.getElementById('chat-toggle').classList.remove('has-unread');
+  }
+
+  function sendChat() {
+    const inp = document.getElementById('chat-input');
+    const text = inp.value.trim();
+    if (!text) return;
+    socket.emit('chat_message', { text });
+    inp.value = '';
+  }
+
+  function appendChat(playerId, name, text) {
+    const msgs = document.getElementById('chat-messages');
+    const div = document.createElement('div');
+    div.className = 'chat-msg' + (playerId === myId ? ' mine' : '');
+    div.innerHTML = `<div class="msg-name">${esc(name)}</div><div class="msg-text">${esc(text)}</div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+    if (!chatOpen) document.getElementById('chat-toggle').classList.add('has-unread');
+  }
+
+  // ── Voice (WebRTC) ────────────────────────────────────────────────────────
+  const RTC_CFG = { iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ]};
+  let localStream = null;
+  let voiceActive = false;
+  const peers = {}; // peerId → RTCPeerConnection
+
+  async function toggleVoice() {
+    voiceActive ? stopVoice() : await startVoice();
+  }
+
+  async function startVoice() {
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    } catch(e) {
+      appendChat('system', 'النظام', 'لا يمكن الوصول للميكروفون: ' + e.message); return;
+    }
+    voiceActive = true;
+    const btn = document.getElementById('voice-btn');
+    btn.textContent = '🔴 إيقاف';
+    btn.classList.add('active');
+    socket.emit('rtc_ready');
+  }
+
+  function stopVoice() {
+    socket.emit('rtc_leave');
+    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+    Object.values(peers).forEach(pc => pc.close());
+    Object.keys(peers).forEach(k => delete peers[k]);
+    voiceActive = false;
+    document.getElementById('voice-btn').textContent = '🎤 صوت';
+    document.getElementById('voice-btn').classList.remove('active');
+    document.getElementById('voice-peers').innerHTML = '';
+  }
+
+  async function makePeer(peerId, initiator) {
+    if (peers[peerId]) peers[peerId].close();
+    const pc = new RTCPeerConnection(RTC_CFG);
+    peers[peerId] = pc;
+    if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+    pc.ontrack = e => {
+      let audio = document.getElementById('audio-' + peerId);
+      if (!audio) { audio = document.createElement('audio'); audio.id = 'audio-' + peerId; audio.autoplay = true; document.body.appendChild(audio); }
+      audio.srcObject = e.streams[0];
+      addVoiceDot(peerId);
+    };
+    pc.onicecandidate = e => { if (e.candidate) socket.emit('rtc_ice', { targetId: peerId, candidate: e.candidate }); };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') removePeer(peerId);
+    };
+    if (initiator) {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit('rtc_offer', { targetId: peerId, offer });
+    }
+    return pc;
+  }
+
+  function removePeer(peerId) {
+    if (peers[peerId]) { peers[peerId].close(); delete peers[peerId]; }
+    const audio = document.getElementById('audio-' + peerId);
+    if (audio) audio.remove();
+    removeVoiceDot(peerId);
+  }
+
+  function addVoiceDot(peerId) {
+    const wrap = document.getElementById('voice-peers');
+    if (!document.getElementById('dot-' + peerId)) {
+      const d = document.createElement('div');
+      d.className = 'voice-dot'; d.id = 'dot-' + peerId;
+      wrap.appendChild(d);
+    }
+  }
+  function removeVoiceDot(peerId) {
+    const d = document.getElementById('dot-' + peerId);
+    if (d) d.remove();
+  }
+
+  // ── Beeps ─────────────────────────────────────────────────────────────────
   function playBeep(freq, duration) {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -802,10 +999,11 @@
         const pts = data.roundScores[p.id] !== undefined ? null : 0;
         const row = document.createElement('div');
 
-        // Determine uniqueness
+        // Determine uniqueness — exclude voided answers from frequency count
         const val = ans.toLowerCase();
-        const countSame = Object.values(data.answers)
-          .map(a => (a[cat] || '').trim().toLowerCase())
+        const countSame = Object.entries(data.answers)
+          .filter(([pid]) => !data.voidedAnswers?.[pid]?.[cat])
+          .map(([, a]) => (a[cat] || '').trim().toLowerCase())
           .filter(v => v && v === val).length;
 
         const voided = data.voidedAnswers?.[p.id]?.[cat];
@@ -873,18 +1071,49 @@
   socket.on('connect_error', () => { document.getElementById('conn-banner').style.display = 'block'; });
 
   // Socket events
+  socket.on('chat_message', ({ playerId, name, text }) => {
+    appendChat(playerId, name, text);
+  });
+
+  socket.on('rtc_peer_joined', async ({ peerId }) => {
+    if (!voiceActive) return;
+    await makePeer(peerId, true);
+  });
+  socket.on('rtc_offer', async ({ fromId, offer }) => {
+    if (!voiceActive) return;
+    const pc = await makePeer(fromId, false);
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    socket.emit('rtc_answer', { targetId: fromId, answer });
+  });
+  socket.on('rtc_answer', async ({ fromId, answer }) => {
+    const pc = peers[fromId];
+    if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer));
+  });
+  socket.on('rtc_ice', async ({ fromId, candidate }) => {
+    const pc = peers[fromId];
+    try { if (pc) await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch(e) {}
+  });
+  socket.on('rtc_peer_left', ({ peerId }) => removePeer(peerId));
+
   socket.on('room_created', ({ roomId, playerId }) => {
     myId = playerId; isHost = true; isBotGame = false;
+    document.getElementById('chat-messages').innerHTML = '';
+    setChatVisible(true);
     show('lobby');
   });
 
   socket.on('bot_game_created', ({ playerId }) => {
     myId = playerId; isHost = true; isBotGame = true;
-    // stay on bot-setup; round_start will navigate to game
+    document.getElementById('chat-messages').innerHTML = '';
+    setChatVisible(false); // solo bot game — no chat needed
   });
 
   socket.on('room_joined', ({ roomId, playerId }) => {
     myId = playerId; isHost = false; isBotGame = false;
+    document.getElementById('chat-messages').innerHTML = '';
+    setChatVisible(true);
     show('lobby');
   });
 
@@ -1012,6 +1241,8 @@
     myId = playerId;
     isHost = host;
     isBotGame = false;
+    document.getElementById('chat-messages').innerHTML = '';
+    setChatVisible(true);
     show('lobby');
   });
 

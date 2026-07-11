@@ -978,7 +978,40 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('chat_message', ({ text }) => {
+    if (!rateLimit(socket.id, 'chat_message', 60)) return;
+    const room = rooms[socket.data.roomId];
+    if (!room || !room.players[socket.id]) return;
+    const safeText = sanitize(text, 200);
+    if (!safeText) return;
+    io.to(socket.data.roomId).emit('chat_message', {
+      playerId: socket.id,
+      name: room.players[socket.id].name,
+      text: safeText,
+    });
+  });
+
+  socket.on('rtc_ready', () => {
+    socket.to(socket.data.roomId).emit('rtc_peer_joined', { peerId: socket.id });
+  });
+  socket.on('rtc_leave', () => {
+    socket.to(socket.data.roomId).emit('rtc_peer_left', { peerId: socket.id });
+  });
+  socket.on('rtc_offer', ({ targetId, offer }) => {
+    const t = io.sockets.sockets.get(targetId);
+    if (t) t.emit('rtc_offer', { fromId: socket.id, offer });
+  });
+  socket.on('rtc_answer', ({ targetId, answer }) => {
+    const t = io.sockets.sockets.get(targetId);
+    if (t) t.emit('rtc_answer', { fromId: socket.id, answer });
+  });
+  socket.on('rtc_ice', ({ targetId, candidate }) => {
+    const t = io.sockets.sockets.get(targetId);
+    if (t) t.emit('rtc_ice', { fromId: socket.id, candidate });
+  });
+
   socket.on('disconnect', () => {
+    socket.to(socket.data.roomId).emit('rtc_peer_left', { peerId: socket.id });
     removeFromQueue(socket.id);
     broadcastQueueUpdate();
     // Clean up rate limit entries
