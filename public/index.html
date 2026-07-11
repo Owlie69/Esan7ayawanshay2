@@ -351,29 +351,31 @@
     font-weight: 700; font-size: .9rem;
   }
 
-  /* Countdown overlay */
+  /* Countdown banner — non-blocking, sits above submit button */
   #countdown-overlay {
-    position: fixed; inset: 0; z-index: 200;
-    background: rgba(0,0,0,.82);
     display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
+    background: rgba(255,210,0,.12);
+    border: 1.5px solid rgba(255,210,0,.45);
+    border-radius: 12px;
+    padding: 10px 18px;
+    margin-bottom: 10px;
+    text-align: center;
+    animation: fadeIn .25s ease;
   }
-  #countdown-overlay.active { display: flex; }
+  #countdown-overlay.active { display: block; }
   #countdown-num {
-    font-size: 7rem; font-weight: 900; line-height: 1;
-    background: linear-gradient(135deg, #f7971e, #ffd200);
+    font-size: 2rem; font-weight: 900;
+    background: linear-gradient(90deg, #f7971e, #ffd200);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    display: inline;
     animation: cdbump .35s ease-out;
   }
   @keyframes cdbump {
-    0% { transform: scale(1.4); opacity: .5; }
+    0% { transform: scale(1.3); opacity: .5; }
     100% { transform: scale(1); opacity: 1; }
   }
-  #countdown-label { color: #ccc; font-size: 1rem; }
+  #countdown-label { color: #ccc; font-size: .85rem; margin-top: 2px; }
 
   /* Scoring letter badge */
   .scoring-letter-badge {
@@ -477,7 +479,7 @@
 <!-- Chat toggle button -->
 <button id="chat-toggle" onclick="toggleChat()">💬</button>
 
-<!-- Chat panel -->
+<!-- Chat panel (positioned via CSS) -->
 <div id="chat-panel">
   <div id="chat-messages"></div>
   <div class="voice-row">
@@ -489,12 +491,6 @@
     <input id="chat-input" placeholder="اكتب رسالة..." maxlength="200"
       onkeydown="if(event.key==='Enter')sendChat()">
   </div>
-</div>
-
-<!-- Countdown overlay (shown when first player submits) -->
-<div id="countdown-overlay">
-  <div id="countdown-num">3</div>
-  <div id="countdown-label">لاعب أرسل إجاباته — جاري الإنهاء...</div>
 </div>
 
 <!-- HOME -->
@@ -627,6 +623,11 @@
 
   <div class="card">
     <div class="cat-inputs" id="cat-inputs"></div>
+  </div>
+
+  <div id="countdown-overlay">
+    <span id="countdown-num">3</span>
+    <div id="countdown-label">لاعب أرسل — لديك لحظات لإضافة إجاباتك!</div>
   </div>
 
   <button class="btn-primary" id="submit-btn" onclick="submitAnswers()">إرسال الإجابات ✓</button>
